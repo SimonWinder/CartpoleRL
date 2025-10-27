@@ -1,37 +1,90 @@
-# Run `pip install "gymnasium[classic-control]"` for this example.
+"""
+Simple heuristic controller for CartPole-v1
+Uses the pole's angular velocity to decide which direction to push the cart.
+"""
 import gymnasium as gym
+import numpy as np
 
-gym.pprint_registry()
 
-# Create our training environment - a cart with a pole that needs balancing
-env = gym.make("CartPole-v1", render_mode="human")
+def heuristic_policy(observation):
+    """
+    Simple heuristic: push cart in the direction of the pole's angular velocity.
 
-# Reset environment to start a new episode
-observation, info = env.reset()
-# observation: what the agent can "see" - cart position, velocity, pole angle, etc.
-# info: extra debugging information (usually not needed for basic learning)
+    Args:
+        observation: [cart_position, cart_velocity, pole_angle, pole_angular_velocity]
 
-print(f"Starting observation: {observation}")
-# Example output: [ 0.01234567 -0.00987654  0.02345678  0.01456789]
-# [cart_position, cart_velocity, pole_angle, pole_angular_velocity]
+    Returns:
+        action: 0 (left) or 1 (right)
+    """
+    # Index 3 is pole angular velocity
+    pole_angular_velocity = observation[3]
 
-episode_over = False
-total_reward = 0
+    # Push right if pole is falling right, left if falling left
+    action = 1 if pole_angular_velocity > 0 else 0
 
-while not episode_over:
-    # Choose an action: 0 = push cart left, 1 = push cart right
-    action = env.action_space.sample()  # Random action for now - real agents will be smarter!
-    action = 1 if observation[3]>0 else 0
-    # Take the action and see what happens
-    observation, reward, terminated, truncated, info = env.step(action)
-    print(observation, action, reward)
+    return action
 
-    # reward: +1 for each step the pole stays upright
-    # terminated: True if pole falls too far (agent failed)
-    # truncated: True if we hit the time limit (500 steps)
 
-    total_reward += reward
-    episode_over = terminated or truncated
+def evaluate_heuristic(episodes=10, render=True, verbose=True):
+    """
+    Evaluate the heuristic controller over multiple episodes.
 
-print(f"Episode finished! Total reward: {total_reward}")
-env.close()
+    Args:
+        episodes: Number of episodes to run
+        render: Whether to render the environment
+        verbose: Whether to print detailed output per episode
+
+    Returns:
+        avg_reward: Average reward over all episodes
+    """
+    render_mode = "human" if render else None
+    env = gym.make("CartPole-v1", render_mode=render_mode)
+
+    total_rewards = []
+
+    print(f"Evaluating heuristic controller for {episodes} episodes...")
+    print(f"Policy: Push cart in direction of pole's angular velocity\n")
+
+    for episode in range(episodes):
+        observation, info = env.reset()
+        episode_reward = 0
+
+        if verbose and episode == 0:
+            print(f"Starting observation: {observation}")
+            print("[cart_position, cart_velocity, pole_angle, pole_angular_velocity]\n")
+
+        while True:
+            # Use heuristic policy to select action
+            action = heuristic_policy(observation)
+
+            # Take action in environment
+            observation, reward, terminated, truncated, info = env.step(action)
+            episode_reward += reward
+
+            if terminated or truncated:
+                break
+
+        total_rewards.append(episode_reward)
+        print(f"Episode {episode + 1}: Reward = {episode_reward}")
+
+    env.close()
+
+    avg_reward = np.mean(total_rewards)
+    std_reward = np.std(total_rewards)
+    min_reward = np.min(total_rewards)
+    max_reward = np.max(total_rewards)
+
+    print(f"\n{'='*50}")
+    print(f"Results over {episodes} episodes:")
+    print(f"  Average reward: {avg_reward:.2f}")
+    print(f"  Std deviation:  {std_reward:.2f}")
+    print(f"  Min reward:     {min_reward:.2f}")
+    print(f"  Max reward:     {max_reward:.2f}")
+    print(f"{'='*50}")
+
+    return avg_reward
+
+
+if __name__ == "__main__":
+    # Run evaluation with multiple episodes
+    evaluate_heuristic(episodes=10, render=True, verbose=True)
